@@ -61,8 +61,10 @@ group :test do
   gem "minitest"
   gem "mocha", require: false
   gem "rails-controller-testing"
+  gem "selenium-webdriver"
   gem "shoulda-context", require: false
   gem "simplecov"
   gem "timecop"
+  gem "webdrivers"
   gem "webmock"
 end
