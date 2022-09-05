@@ -2,19 +2,21 @@ default: &default
   adapter: mysql2
   encoding: utf8
   reconnect: true
-  username: signonotron2
-  password: signonotron2
   pool: 5
 
 development:
   <<: *default
+  host: 127.0.0.1
+  username: signonotron2
+  password: signonotron2
   database: signonotron2_development
-  url: <%= ENV["DATABASE_URL"] %>
 
 test: &test
   <<: *default
+  host: 127.0.0.1
+  username: signonotron2
+  password: signonotron2
   database: signonotron2_test
-  url: <%= ENV["TEST_DATABASE_URL"] %>
 
 production:
   <<: *default
