@@ -1,0 +1,22 @@
+version: "2"
+services:
+  hmrc-redis:
+    container_name: redis
+    image: redis
+    ports:
+      - 6379:6379
+    volumes:
+      - hmrc-redis:/data
+  hmrc-mysql:
+    container_name: hmrc-mysql
+    image: mysql:8.0.30
+    environment:
+      - MYSQL_DATABASE=signonotron2_development
+      - MYSQL_USER=signonotron2
+      - MYSQL_PASSWORD=signonotron2
+      - MYSQL_ROOT_PASSWORD=
+      - MYSQL_ALLOW_EMPTY_PASSWORD=true
+    ports:
+      - 3306:3306
+    volumes:
+      - hmrc-mysql-8:/var/lib/mysql
