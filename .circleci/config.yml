@@ -2,10 +2,11 @@ version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@2.0.3
-  ruby: circleci/ruby@1
+  browser-tools: circleci/browser-tools@1.1
   cloudfoundry: circleci/cloudfoundry@1.0
-  slack: circleci/slack@4.3.0
   queue: eddiewebb/queue@1.6.4
+  ruby: circleci/ruby@1
+  slack: circleci/slack@4.3.0
   tariff: trade-tariff/trade-tariff-ci-orb@0 # can also change to @dev:<gitsha> for specific version or @dev:alpha to test dev branches
 
 commands:
@@ -238,12 +239,11 @@ jobs:
 
   test:
     docker:
-      - image: cimg/ruby:2.7.6
+      - image: cimg/ruby:2.7.6-node
         environment:
           BUNDLE_JOBS: "3"
           BUNDLE_RETRY: "3"
           RAILS_ENV: "test"
-          DATABASE_URL: "mysql://signonotron2:signonotron2@localhost:3306/signonotron2_test"
           REDIS_URL: "redis://localhost:6379"
       - image: cimg/mysql:8.0
         environment:
@@ -254,16 +254,14 @@ jobs:
     resource_class: medium
     steps:
       - checkout
+      - browser-tools/install-chrome
       - run:
           name: "Install OS packages"
           command: |
             sudo apt-get update
             sudo apt-get install -y --no-install-suggests --no-install-recommends nodejs libmariadb-dev-compat
       - ruby/install-deps
-      - run:
-          name: "Setup DB"
-          command: |
-            RAILS_ENV=test bundle exec rails db:schema:load
+      - run: "RAILS_ENV=test bundle exec rails db:schema:load --trace"
       - run:
           name: "Run tests"
           command: |
