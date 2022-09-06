@@ -30,3 +30,5 @@ yarn-error.log
 
 # Ignore compiled Rails assets
 /public/assets
+
+*manifest*.yml
