@@ -70,4 +70,5 @@ COPY --from=builder /app ./
 RUN groupadd -g 1001 app && \
     useradd -u 1001 -g app app
 USER 1001
-CMD bundle exec puma
+
+CMD ["bundle", "exec", "rails", "server", "-b", "0.0.0.0"]
