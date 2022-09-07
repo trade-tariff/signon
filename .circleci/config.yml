@@ -45,13 +45,13 @@ commands:
             # Verify new version is working on dark URL.
             APP_NAME="signon-<< parameters.environment_key >>-dark"
 
-            HTTPCODE=`cf ssh $APP_NAME -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/healthcheck/api-tokens'`
+            HTTPCODE=`cf ssh $APP_NAME -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/healthcheck/api-tokens'`
 
             if [ "$HTTPCODE" -ne 200 ]
             then
               echo "dark route not available, failing deploy ($HTTPCODE)"
               cf logs "signon-<< parameters.environment_key >>-dark" --recent
-              cf delete -f "signon-<< parameters.environment_key >>-dark"
+              # cf delete -f "signon-<< parameters.environment_key >>-dark"
               exit 1
             fi
       - run:
@@ -292,14 +292,14 @@ workflows:
   version: 2
   ci:
     jobs:
-      - linters:
-          context: trade-tariff
-      - test:
-          context: trade-tariff
-          filters:
-            branches:
-              ignore:
-                - main
+      # - linters:
+      #     context: trade-tariff
+      # - test:
+      #     context: trade-tariff
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - main
       - build:
           name: build_dev
           context: trade-tariff
@@ -317,5 +317,5 @@ workflows:
                 - main
                 - /^dependabot\/.*/
           requires:
-            - test
+            # - test
             - build_dev

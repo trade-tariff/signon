@@ -11,7 +11,7 @@ development:
   password: signonotron2
   database: signonotron2_development
 
-test: &test
+test:
   <<: *default
   host: 127.0.0.1
   username: signonotron2
@@ -19,5 +19,8 @@ test: &test
   database: signonotron2_test
 
 production:
-  <<: *default
-  url: <%= ENV["DATABASE_URL"] %>
+  adapter: mysql2
+  encoding: utf8
+  reconnect: true
+  pool: 5
+  url: <%= "#{ENV['DATABASE_URL']}&ssl_mode=required" if Rails.env.production? %>
