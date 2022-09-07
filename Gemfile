@@ -43,8 +43,8 @@ gem "govuk_sidekiq"
 gem "plek"
 
 # Online Trade Tariff
-gem 'lograge'
-gem 'logstash-event'
+gem "lograge"
+gem "logstash-event"
 
 group :development do
   gem "better_errors"
