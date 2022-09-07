@@ -42,6 +42,10 @@ gem "govuk_publishing_components"
 gem "govuk_sidekiq"
 gem "plek"
 
+# Online Trade Tariff
+gem 'lograge'
+gem 'logstash-event'
+
 group :development do
   gem "better_errors"
   gem "binding_of_caller"
