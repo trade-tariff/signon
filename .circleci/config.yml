@@ -36,16 +36,7 @@ commands:
             CF_DOCKER_PASSWORD=$AWS_SECRET_ACCESS_KEY cf push "signon-<< parameters.environment_key >>-dark" -f deploy_manifest.yml --no-route  --docker-image "$ECR_REPO/$DOCKER_IMAGE:$DOCKER_TAG" --docker-username "$AWS_ACCESS_KEY_ID"
 
             # Map dark route
-            cf map-route  "signon-<< parameters.environment_key >>-dark" apps.internal -n "signon-<< parameters.environment_key >>-dark"
-
-            # Attach precreated autoscaling policy
-            cf attach-autoscaling-policy "signon-<< parameters.environment_key >>-dark" config/autoscaling/<< parameters.space >>-policy.json
-
-            # Enable routing from this frontend to backend applications which are private
-            cf add-network-policy "$CF_FRONTEND_APP-<< parameters.environment_key >>" "signon-<< parameters.environment_key >>-dark" --protocol tcp --port 8080
-            cf add-network-policy "$CF_ADMIN_APP-<< parameters.environment_key >>" "signon-<< parameters.environment_key >>-dark" --protocol tcp --port 8080
-            cf add-network-policy "$CF_DUTYCALCULATOR_APP-<< parameters.environment_key >>" "signon-<< parameters.environment_key >>-dark" --protocol tcp --port 8080
-            cf add-network-policy "signon-<< parameters.environment_key >>-dark" "tariff-search-query-parser-<< parameters.environment_key >>" --protocol tcp --port 8080
+            cf map-route  "signon-<< parameters.environment_key >>-dark" london.cloudapps.digital --hostname "signon-<< parameters.environment_key >>-dark"
 
       - run:
           name: "Verify new version is working on dark URL."
@@ -54,9 +45,10 @@ commands:
             # Verify new version is working on dark URL.
             APP_NAME="signon-<< parameters.environment_key >>-dark"
 
-            HTTPCODE=`cf ssh $APP_NAME -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/healthcheck/ready'`
+            HTTPCODE=`cf ssh $APP_NAME -c 'curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/healthcheck/api-tokens'`
 
-            if [ "$HTTPCODE" -ne 200 ];then
+            if [ "$HTTPCODE" -ne 200 ]
+            then
               echo "dark route not available, failing deploy ($HTTPCODE)"
               cf logs "signon-<< parameters.environment_key >>-dark" --recent
               cf delete -f "signon-<< parameters.environment_key >>-dark"
@@ -66,20 +58,17 @@ commands:
           name: "Switch dark app to live"
           command: |
             # Send "real" url to new version
-            cf unmap-route  "signon-<< parameters.environment_key >>-dark" apps.internal -n "signon-<< parameters.environment_key >>-dark"
+            cf unmap-route "signon-<< parameters.environment_key >>-dark" london.cloudapps.digital --hostname "signon-<< parameters.environment_key >>-dark"
 
             # Start sending traffic to new version
-            cf map-route "signon-<< parameters.environment_key >>-dark" apps.internal -n "signon-<< parameters.environment_key >>"
-            cf map-route "signon-<< parameters.environment_key >>-dark" "<< parameters.domain_prefix >>.trade-tariff.service.gov.uk" --path "/<< parameters.service >>/api/beta/"
+            cf map-route "signon-<< parameters.environment_key >>-dark" london.cloudapps.digital --hostname "signon-<< parameters.environment_key >>"
 
             # Stop sending traffic to previous version
-            cf unmap-route "signon-<< parameters.environment_key >>" apps.internal -n "signon-<< parameters.environment_key >>"
-            cf unmap-route "signon-<< parameters.environment_key >>" "<< parameters.domain_prefix >>.trade-tariff.service.gov.uk" --path "/<< parameters.service >>/api/beta/"
-
-            # stop previous version
+            cf unmap-route "signon-<< parameters.environment_key >>" london.cloudapps.digital --hostname "signon-<< parameters.environment_key >>"
+            # Stop previous version
             cf stop "signon-<< parameters.environment_key >>"
 
-            # delete previous version
+            # Delete previous version
             cf delete "signon-<< parameters.environment_key >>" -f
 
             # Switch name of "dark" version to claim correct name
@@ -93,91 +82,91 @@ commands:
           channel: deployments
           event: pass
           template: basic_success_1
-  cf_deploy_docker_worker:
-    parameters:
-      docker_image_tag:
-        type: string
-      space:
-        type: string
-      service:
-        type: string
-      environment_key:
-        type: string
-    steps:
-      - checkout
-      - tariff/cf-install:
-          space: << parameters.space >>
-      - run:
-          name: "Fetch existing manifest"
-          command: |
-            cf create-app-manifest "signon-worker-<< parameters.environment_key >>" -p deploy_manifest.yml
-      - run:
-          name: "Push Worker"
-          command: |
-            export DOCKER_IMAGE=tariff-backend
-            export DOCKER_TAG="<< parameters.docker_image_tag >>"
-            CF_DOCKER_PASSWORD=$AWS_SECRET_ACCESS_KEY cf push "signon-worker-<< parameters.environment_key >>" -f deploy_manifest.yml --no-route --docker-image "$ECR_REPO/$DOCKER_IMAGE:$DOCKER_TAG" --docker-username "$AWS_ACCESS_KEY_ID"
+  # cf_deploy_docker_worker:
+  #   parameters:
+  #     docker_image_tag:
+  #       type: string
+  #     space:
+  #       type: string
+  #     service:
+  #       type: string
+  #     environment_key:
+  #       type: string
+  #   steps:
+  #     - checkout
+  #     - tariff/cf-install:
+  #         space: << parameters.space >>
+  #     - run:
+  #         name: "Fetch existing manifest"
+  #         command: |
+  #           cf create-app-manifest "signon-worker-<< parameters.environment_key >>" -p deploy_manifest.yml
+  #     - run:
+  #         name: "Push Worker"
+  #         command: |
+  #           export DOCKER_IMAGE=tariff-backend
+  #           export DOCKER_TAG="<< parameters.docker_image_tag >>"
+  #           CF_DOCKER_PASSWORD=$AWS_SECRET_ACCESS_KEY cf push "signon-worker-<< parameters.environment_key >>" -f deploy_manifest.yml --no-route --docker-image "$ECR_REPO/$DOCKER_IMAGE:$DOCKER_TAG" --docker-username "$AWS_ACCESS_KEY_ID"
 
-  cf_deploy_docker_tasks:
-    parameters:
-      docker_image_tag:
-        type: string
-      space:
-        type: string
-      service:
-        type: string
-      environment_key:
-        type: string
-    steps:
-      - checkout
-      - tariff/cf-install:
-          space: << parameters.space >>
-      - run:
-          name: "Create tasks app manifest"
-          command: |
-            cf create-app-manifest "signon-worker-<< parameters.environment_key >>" -p tasks_deploy_manifest.yml
-      - run:
-          name: "Push Tasks app"
-          command: |
-            export DOCKER_IMAGE=tariff-backend
-            export DOCKER_TAG="<< parameters.docker_image_tag >>"
-            CF_DOCKER_PASSWORD=$AWS_SECRET_ACCESS_KEY cf push "signon-tasks-<< parameters.environment_key >>" \
-                                                               -f tasks_deploy_manifest.yml \
-                                                               --no-route \
-                                                               --task \
-                                                               --docker-image "$ECR_REPO/$DOCKER_IMAGE:$DOCKER_TAG" \
-                                                               --docker-username "$AWS_ACCESS_KEY_ID"
-      - run_migrations:
-          environment_key: << parameters.environment_key >>
+  # cf_deploy_docker_tasks:
+  #   parameters:
+  #     docker_image_tag:
+  #       type: string
+  #     space:
+  #       type: string
+  #     service:
+  #       type: string
+  #     environment_key:
+  #       type: string
+  #   steps:
+  #     - checkout
+  #     - tariff/cf-install:
+  #         space: << parameters.space >>
+  #     - run:
+  #         name: "Create tasks app manifest"
+  #         command: |
+  #           cf create-app-manifest "signon-worker-<< parameters.environment_key >>" -p tasks_deploy_manifest.yml
+  #     - run:
+  #         name: "Push Tasks app"
+  #         command: |
+  #           export DOCKER_IMAGE=tariff-backend
+  #           export DOCKER_TAG="<< parameters.docker_image_tag >>"
+  #           CF_DOCKER_PASSWORD=$AWS_SECRET_ACCESS_KEY cf push "signon-tasks-<< parameters.environment_key >>" \
+  #                                                              -f tasks_deploy_manifest.yml \
+  #                                                              --no-route \
+  #                                                              --task \
+  #                                                              --docker-image "$ECR_REPO/$DOCKER_IMAGE:$DOCKER_TAG" \
+  #                                                              --docker-username "$AWS_ACCESS_KEY_ID"
+  #     - run_migrations:
+  #         environment_key: << parameters.environment_key >>
 
-  sentry-release:
-    steps:
-      - checkout
-      - run:
-          name: Create release and notify Sentry of deploy
-          command: |
-            sudo curl -sL \
-                      -o /usr/local/bin/sentry-cli \
-                      https://github.com/getsentry/sentry-cli/releases/download/1.74.3/sentry-cli-Linux-x86_64
-            sudo chmod 0755 /usr/local/bin/sentry-cli
-            export SENTRY_RELEASE=$(sentry-cli releases propose-version)
-            sentry-cli releases new -p $SENTRY_PROJECT $SENTRY_RELEASE &&
-              sentry-cli releases set-commits $SENTRY_RELEASE --auto &&
-              sentry-cli releases finalize $SENTRY_RELEASE &&
-              sentry-cli releases deploys $SENTRY_RELEASE new -e $SENTRY_ENVIRONMENT ||
-              /usr/bin/true # prevent sentry outage from blocking deploys - see HOTT-1570
+  # sentry-release:
+  #   steps:
+  #     - checkout
+  #     - run:
+  #         name: Create release and notify Sentry of deploy
+  #         command: |
+  #           sudo curl -sL \
+  #                     -o /usr/local/bin/sentry-cli \
+  #                     https://github.com/getsentry/sentry-cli/releases/download/1.74.3/sentry-cli-Linux-x86_64
+  #           sudo chmod 0755 /usr/local/bin/sentry-cli
+  #           export SENTRY_RELEASE=$(sentry-cli releases propose-version)
+  #           sentry-cli releases new -p $SENTRY_PROJECT $SENTRY_RELEASE &&
+  #             sentry-cli releases set-commits $SENTRY_RELEASE --auto &&
+  #             sentry-cli releases finalize $SENTRY_RELEASE &&
+  #             sentry-cli releases deploys $SENTRY_RELEASE new -e $SENTRY_ENVIRONMENT ||
+  #             /usr/bin/true # prevent sentry outage from blocking deploys - see HOTT-1570
 
-  run_migrations:
-    parameters:
-      service:
-        type: string
-      environment_key:
-        type: string
-    steps:
-      - run:
-          name: "Run Migrations"
-          command: |
-            cf run-task "signon-tasks-<< parameters.environment_key >>" --command "cd app && bundle exec rails db:migrate" --name "db-migrate" --wait
+  # run_migrations:
+  #   parameters:
+  #     service:
+  #       type: string
+  #     environment_key:
+  #       type: string
+  #   steps:
+  #     - run:
+  #         name: "Run Migrations"
+  #         command: |
+  #           cf run-task "signon-tasks-<< parameters.environment_key >>" --command "cd app && bundle exec rails db:migrate" --name "db-migrate" --wait
 
 jobs:
   linters:
@@ -275,30 +264,29 @@ jobs:
           event: fail
           template: basic_fail_1
 
-  # deploy_dev:
-  #   docker:
-  #     - image: cimg/ruby:2.7.6
-  #   environment:
-  #     SENTRY_ENVIRONMENT: "development"
-  #   steps:
-  #     - queue/until_front_of_line:
-  #         time: "10"
-  #         consider-branch: false
-  #         dont-quit: true
-  #     - cf_deploy_docker_tasks:
-  #         docker_image_tag: dev-$CIRCLE_SHA1
-  #         space: "development"
-  #         environment_key: "dev"
-  #     - cf_deploy_docker_worker:
-  #         docker_image_tag: dev-$CIRCLE_SHA1
-  #         space: "development"
-  #         environment_key: "dev"
-  #     - cf_deploy_docker:
-  #         docker_image_tag: dev-$CIRCLE_SHA1
-  #         space: "development"
-  #         environment_key: "dev"
-  #         domain_prefix: "dev"
-  #     - sentry-release
+  deploy_dev:
+    docker:
+      - image: cimg/ruby:2.7.6
+    environment:
+      SENTRY_ENVIRONMENT: "development"
+    steps:
+      - queue/until_front_of_line:
+          time: "10"
+          consider-branch: false
+          dont-quit: true
+      # - cf_deploy_docker_tasks:
+      #     docker_image_tag: dev-$CIRCLE_SHA1
+      #     space: "development"
+      #     environment_key: "dev"
+      # - cf_deploy_docker_worker:
+      #     docker_image_tag: dev-$CIRCLE_SHA1
+      #     space: "development"
+      #     environment_key: "dev"
+      - cf_deploy_docker:
+          docker_image_tag: dev-$CIRCLE_SHA1
+          space: "development"
+          environment_key: "dev"
+      # - sentry-release
 
 workflows:
   version: 2
@@ -321,13 +309,13 @@ workflows:
               ignore:
                 - main
                 - /^dependabot\/.*/
-      # - deploy_dev:
-      #     context: trade-tariff
-      #     filters:
-      #       branches:
-      #         ignore:
-      #           - main
-      #           - /^dependabot\/.*/
-      #     requires:
-      #       - test
-      #       - build_dev
+      - deploy_dev:
+          context: trade-tariff
+          filters:
+            branches:
+              ignore:
+                - main
+                - /^dependabot\/.*/
+          requires:
+            - test
+            - build_dev
